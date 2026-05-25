@@ -963,19 +963,20 @@ const App = {
         blockTotalP1dbLinear = sumInvP1db > 0 ? 1 / sumInvP1db : Infinity;
         log += `  Combined Pin: ${blockPin.toFixed(2)} dBm\n`;
       } else if (block.type === 'Mixer') {
-        // Mixer takes RF from 'rf' input port, LO from 'lo' input port
-        const rfWires = incomingWires.filter(w => w.targetPort === 'rf');
+        const isUp = block.params.Type === 'Upconvertor';
+        const signalPort = isUp ? 'if' : 'rf';
+        const sigWires = incomingWires.filter(w => w.targetPort === signalPort);
         const loWires = incomingWires.filter(w => w.targetPort === 'lo');
-        const sigRF = rfWires.length > 0 ? wireSignals[rfWires[0].id] : null;
+        const sigIn = sigWires.length > 0 ? wireSignals[sigWires[0].id] : null;
         const sigLO = loWires.length > 0 ? wireSignals[loWires[0].id] : null;
         
-        if (sigRF) {
-          blockSpectrum = sigRF.spectrum || [];
+        if (sigIn) {
+          blockSpectrum = sigIn.spectrum || [];
           blockPin = getP(blockSpectrum);
-          blockTotalF = sigRF.totalF;
-          blockTotalGainLinear = sigRF.totalGainLinear;
-          blockTotalOip3Linear = sigRF.totalOip3Linear || Infinity;
-          blockTotalP1dbLinear = sigRF.totalP1dbLinear || Infinity;
+          blockTotalF = sigIn.totalF;
+          blockTotalGainLinear = sigIn.totalGainLinear;
+          blockTotalOip3Linear = sigIn.totalOip3Linear || Infinity;
+          blockTotalP1dbLinear = sigIn.totalP1dbLinear || Infinity;
         } else {
           blockPin = -100;
           blockTotalF = 1;
@@ -989,9 +990,10 @@ const App = {
         if (sigLO && sigLO.spectrum && sigLO.spectrum.length > 0) {
           loFreq = sigLO.spectrum[0].freq;
         }
-        log += `  RF Pin: ${blockPin.toFixed(2)} dBm\n`;
+        log += `  Mixer Signal Pin: ${blockPin.toFixed(2)} dBm\n`;
         log += `  LO Freq: ${loFreq} MHz\n`;
         block.currentLOFreq = loFreq;
+        block.isMixerUpconvertor = isUp;
       } else {
         // Standard block (1 input, or we take the first available wire)
         let sig = incomingWires.length > 0 ? wireSignals[incomingWires[0].id] : null;
@@ -1006,8 +1008,17 @@ const App = {
         log += `  Pin: ${blockPin.toFixed(2)} dBm\n`;
       }
       
-      block.calculatedPIn = incomingWires.length > 0 ? blockPin : undefined;
-      block.inputSpectrum = JSON.parse(JSON.stringify(blockSpectrum));
+      if (block.type === 'Mixer') {
+        const isUp = block.params.Type === 'Upconvertor';
+        const signalPort = isUp ? 'if' : 'rf';
+        const sigWires = incomingWires.filter(w => w.targetPort === signalPort);
+        const sigIn = sigWires.length > 0 ? wireSignals[sigWires[0].id] : null;
+        block.calculatedPIn = sigIn ? blockPin : undefined;
+        block.inputSpectrum = sigIn ? JSON.parse(JSON.stringify(blockSpectrum)) : [];
+      } else {
+        block.calculatedPIn = incomingWires.length > 0 ? blockPin : undefined;
+        block.inputSpectrum = JSON.parse(JSON.stringify(blockSpectrum));
+      }
       let outSpectrum = JSON.parse(JSON.stringify(blockSpectrum));
       
       let nextBlockNF = 0;
@@ -1305,6 +1316,9 @@ const App = {
             // Find incoming block on the SNR path
             let prevSnrBlock = null;
             incomingWires.forEach(w => {
+              if (block.type === 'Mixer' && w.targetPort === 'lo') {
+                return; // Ignore LO port wire when finding the signal cascade path
+              }
               if (snrPathInfo.blocks.has(w.sourceId)) {
                 const pb = blocks.find(blk => blk.id === w.sourceId);
                 if (pb && pb.snrNoisePowerW !== undefined) {
