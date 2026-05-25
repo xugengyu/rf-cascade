@@ -51,18 +51,13 @@ class Block {
     
     // Click on a block param line → open a small inline editor for that specific param
     this.paramDisplay.addEventListener('click', (e) => {
-      const span = e.target.closest('.rf-block__param-item--block-val');
-      if (!span) return;
+      const row = e.target.closest('.rf-block__param-row--block-val');
+      if (!row) return;
       e.stopPropagation();
 
-      // Find which param key this span belongs to — it's the first word(s) before the colon
-      const text = span.textContent || '';
-      const colonIdx = text.indexOf(':');
-      if (colonIdx === -1) return;
-      const cleanKey = text.substring(0, colonIdx).trim();
-      // Reverse the key cleaning (spaces → underscores)
-      const paramKey = Object.keys(this.params).find(k => k.replace(/_/g, ' ') === cleanKey);
+      const paramKey = row.dataset.key;
       if (paramKey === undefined) return;
+      const cleanKey = paramKey.replace(/_/g, ' ');
 
       // Remove any existing popover
       const existing = document.getElementById('inline-param-popover');
@@ -141,14 +136,14 @@ class Block {
       inputRow.appendChild(saveBtn);
       popover.appendChild(inputRow);
 
-      // Position near the span
-      const spanRect = span.getBoundingClientRect();
+      // Position near the row
+      const rowRect = row.getBoundingClientRect();
       document.body.appendChild(popover);
       const popRect = popover.getBoundingClientRect();
-      let top = spanRect.bottom + 4;
-      let left = spanRect.left;
+      let top = rowRect.bottom + 4;
+      let left = rowRect.left;
       if (left + popRect.width > window.innerWidth - 8) left = window.innerWidth - popRect.width - 8;
-      if (top + popRect.height > window.innerHeight - 8) top = spanRect.top - popRect.height - 4;
+      if (top + popRect.height > window.innerHeight - 8) top = rowRect.top - popRect.height - 4;
       popover.style.top = top + 'px';
       popover.style.left = left + 'px';
 
@@ -280,6 +275,7 @@ class Block {
 
     const opts = (window.Workspace && window.Workspace.displayOptions) || {
       showBlockParams: true,
+      showCascadedGain: true,
       showCascadedPower: true,
       showCascadedIP3: true,
       showCascadedP1dB: true,
@@ -287,12 +283,10 @@ class Block {
       showFrequency: true
     };
 
-    if (opts.showBlockParams) {
-      Object.entries(this.params).forEach(([key, val]) => {
-        const cleanKey = key.replace(/_/g, ' ');
-        lines.push(`<span class="rf-block__param-item rf-block__param-item--block-val" style="cursor: pointer;" title="Click to edit parameters">${cleanKey}: ${val}</span>`);
-      });
-    }
+    // Determine if this block is at the end of the RF signal chain (leaf node)
+    const isEnd = (window.Workspace && window.Workspace.wires && this.type !== 'Annotation') 
+      ? !window.Workspace.wires.some(w => w.sourceId === this.id) 
+      : false;
 
     // Read thresholds from App settings (fallback to 10 dB if App not yet initialized)
     const appSettings = (window.App && window.App.settings) || {};
@@ -327,40 +321,101 @@ class Block {
       }
     }
 
-    if (opts.showCascadedPower) {
+    const addRow = (label, value, rowClass = '', rowStyle = '', labelStyle = '', valueStyle = '', datasetKey = '') => {
+      const dataAttr = datasetKey ? `data-key="${datasetKey}"` : '';
+      lines.push(`
+        <div class="rf-block__param-row ${rowClass}" style="${rowStyle}" ${dataAttr}>
+          <span class="rf-block__param-label" style="${labelStyle}">${label}</span>
+          <span class="rf-block__param-colon">:</span>
+          <span class="rf-block__param-value" style="${valueStyle}">${value}</span>
+        </div>
+      `);
+    };
+
+    if (opts.showBlockParams) {
+      Object.entries(this.params).forEach(([key, val]) => {
+        const cleanKey = key.replace(/_/g, ' ');
+        let style = '';
+        if (key === 'OIP3_dBm' && (oip3Violated || iip3Violated)) {
+          style = 'color: #ff4444; font-weight: bold;';
+        }
+        if (key === 'P1dB_dBm' && (p1dbOutViolated || p1dbInViolated)) {
+          style = 'color: #ff4444; font-weight: bold;';
+        }
+        addRow(cleanKey, val, 'rf-block__param-row--block-val', 'cursor: pointer;', style, style, key);
+      });
+    }
+
+    if (isEnd || opts.showCascadedGain) {
+      if (this.calculatedGain !== undefined && !isNaN(this.calculatedGain)) {
+        addRow('Cascaded Gain', `${this.calculatedGain.toFixed(2)} dB`, 'rf-block__param-row--cascading-val');
+      }
+    }
+
+    if (isEnd || opts.showCascadedPower) {
       if (this.calculatedPIn !== undefined) {
-        lines.push(`<span class="rf-block__param-item rf-block__param-item--cascading-val">Cascaded Pin: ${this.calculatedPIn.toFixed(2)} dBm</span>`);
+        addRow('Cascaded Pin', `${this.calculatedPIn.toFixed(2)} dBm`, 'rf-block__param-row--cascading-val');
       }
+      if (this.snrNoisePowerW !== undefined && this.calculatedPIn !== undefined && window.Workspace && window.Workspace.snrStartBlockId && window.Workspace.snrEndBlockId) {
+        // If there's an input signal, calculate input noise power
+        // prevSnrBlock noise power * linearGain = output noise power of previous block. That is the input noise power to this block.
+        // Let's compute input noise power: output noise power / linearGain? Or we can track incoming noise power.
+        // Let's retrieve input noise power from previous block output noise power, or we can compute it:
+        // prevBlock.snrNoisePowerW is input noise power to this block.
+        let inputNoisePowerW = undefined;
+        if (window.Workspace.wires) {
+          const incoming = window.Workspace.wires.find(w => w.targetId === this.id);
+          if (incoming) {
+            const pb = window.Workspace.blocks.find(blk => blk.id === incoming.sourceId);
+            if (pb && pb.snrNoisePowerW !== undefined) {
+              inputNoisePowerW = pb.snrNoisePowerW;
+            }
+          }
+        }
+        if (inputNoisePowerW !== undefined) {
+          const inputNoisePowerdBm = 10 * Math.log10(inputNoisePowerW * 1000);
+          addRow('Cascaded Nin', `${inputNoisePowerdBm.toFixed(2)} dBm`, 'rf-block__param-row--cascading-val');
+        }
+      }
+
       if (this.calculatedPOut !== undefined) {
-        lines.push(`<span class="rf-block__param-item rf-block__param-item--cascading-val">Cascaded Pout: ${this.calculatedPOut.toFixed(2)} dBm</span>`);
+        addRow('Cascaded Pout', `${this.calculatedPOut.toFixed(2)} dBm`, 'rf-block__param-row--cascading-val');
+      }
+      if (this.snrNoisePowerW !== undefined && this.type !== 'Load' && window.Workspace && window.Workspace.snrStartBlockId && window.Workspace.snrEndBlockId) {
+        const outputNoisePowerdBm = 10 * Math.log10(this.snrNoisePowerW * 1000);
+        addRow('Cascaded Nout', `${outputNoisePowerdBm.toFixed(2)} dBm`, 'rf-block__param-row--cascading-val');
       }
     }
 
-    if (opts.showCascadedNF) {
+    if (isEnd || opts.showCascadedNF) {
       if (this.calculatedNF !== undefined) {
-        lines.push(`<span class="rf-block__param-item rf-block__param-item--cascading-val">Cascaded NF: ${this.calculatedNF.toFixed(2)} dB</span>`);
+        addRow('Cascaded NF', `${this.calculatedNF.toFixed(2)} dB`, 'rf-block__param-row--cascading-val');
       }
     }
 
-    if (opts.showCascadedIP3) {
+    if (isEnd || opts.showCascadedIP3) {
       if (this.calculatedOIP3 !== undefined && !isNaN(this.calculatedOIP3)) {
         const oip3Str = isFinite(this.calculatedOIP3) ? this.calculatedOIP3.toFixed(2) + ' dBm' : 'inf';
         const oip3Style = oip3Violated ? 'color: #ff4444; font-weight: bold;' : '';
-        lines.push(`<span class="rf-block__param-item rf-block__param-item--cascading-val" style="${oip3Style}">Cascaded OIP3: ${oip3Str}</span>`);
+        addRow('Cascaded OIP3', oip3Str, 'rf-block__param-row--cascading-val', '', '', oip3Style);
       }
       if (this.calculatedIIP3 !== undefined && !isNaN(this.calculatedIIP3)) {
         const iip3Str = isFinite(this.calculatedIIP3) ? this.calculatedIIP3.toFixed(2) + ' dBm' : 'inf';
         const iip3Style = iip3Violated ? 'color: #ff4444; font-weight: bold;' : '';
-        lines.push(`<span class="rf-block__param-item rf-block__param-item--cascading-val" style="${iip3Style}">Cascaded IIP3: ${iip3Str}</span>`);
+        addRow('Cascaded IIP3', iip3Str, 'rf-block__param-row--cascading-val', '', '', iip3Style);
       }
     }
 
-    if (opts.showCascadedP1dB) {
+    if (isEnd || opts.showCascadedP1dB) {
       if (this.calculatedP1dB_out !== undefined && !isNaN(this.calculatedP1dB_out)) {
         const p1dbStr = isFinite(this.calculatedP1dB_out) ? this.calculatedP1dB_out.toFixed(2) + ' dBm' : 'inf';
         const p1dbStyle = (p1dbOutViolated || p1dbInViolated) ? 'color: #ff4444; font-weight: bold;' : '';
-        lines.push(`<span class="rf-block__param-item rf-block__param-item--cascading-val" style="${p1dbStyle}">Cascaded P1dB: ${p1dbStr}</span>`);
+        addRow('Cascaded P1dB', p1dbStr, 'rf-block__param-row--cascading-val', '', '', p1dbStyle);
       }
+    }
+
+    if (this.calculatedSNR !== undefined && !isNaN(this.calculatedSNR)) {
+      addRow('Cascaded SNR', `${this.calculatedSNR.toFixed(2)} dB`, 'rf-block__param-row--snr-val');
     }
 
     if (opts.showFrequency) {
@@ -368,7 +423,17 @@ class Block {
         const freqStr = this.calculatedFrequencies.length > 3 
           ? `${this.calculatedFrequencies.slice(0, 3).join(', ')}...`
           : this.calculatedFrequencies.join(', ');
-        lines.push(`<span class="rf-block__param-item rf-block__param-item--frequency-val">Freq: ${freqStr} MHz</span>`);
+        addRow('Freq', `${freqStr} MHz`, 'rf-block__param-row--frequency-val');
+      }
+    }
+
+    // Add marker indicators underneath the parameters for debugging/visual aid (optional, but requested: "highlighted by faint green glow... every block along SNR calculation shows Cascaded SNR")
+    if (window.Workspace) {
+      if (window.Workspace.snrStartBlockId === this.id) {
+        addRow('SNR Start', 'Active', 'rf-block__param-row--snr-val');
+      }
+      if (window.Workspace.snrEndBlockId === this.id) {
+        addRow('SNR End', 'Active', 'rf-block__param-row--snr-val');
       }
     }
 
@@ -383,6 +448,8 @@ class Block {
     this.calculatedIIP3 = undefined;
     this.calculatedP1dB_out = undefined;
     this.calculatedFrequencies = undefined;
+    this.calculatedSNR = undefined;
+    this.snrNoisePowerW = undefined;
     this.updateParamDisplay();
   }
 
@@ -494,6 +561,7 @@ class SignalSource extends Block {
     this.params = {
       Frequency_MHz: 2400,
       Power_dBm: -50,
+      Noise_Floor_dBm_Hz: -174,
       NF_dB: 0
     };
   }

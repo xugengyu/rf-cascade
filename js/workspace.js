@@ -26,10 +26,11 @@ const Workspace = {
   panY: 0,
   displayOptions: {
     showBlockParams: true,
-    showCascadedPower: true,
-    showCascadedIP3: true,
-    showCascadedP1dB: true,
-    showCascadedNF: true,
+    showCascadedGain: false,
+    showCascadedPower: false,
+    showCascadedIP3: false,
+    showCascadedP1dB: false,
+    showCascadedNF: false,
     showFrequency: false,
     showLogs: true
   },
@@ -41,6 +42,8 @@ const Workspace = {
   lastMouseX: 200,
   lastMouseY: 200,
   resultsStale: false,
+  snrStartBlockId: null,
+  snrEndBlockId: null,
 
   init() {
     this.container = document.getElementById('workspace');
@@ -141,6 +144,21 @@ const Workspace = {
       this.resultsStale = true;
       const btn = document.getElementById('btn-calculate');
       if (btn) btn.textContent = '⚠ Simulate';
+      
+      // Clear SNR highlights and calculated SNR numbers
+      this.blocks.forEach(b => {
+        b.calculatedSNR = undefined;
+        b.snrNoisePowerW = undefined;
+        if (b.element) {
+          b.element.classList.remove('snr-path-highlight');
+        }
+        b.updateParamDisplay();
+      });
+      this.wires.forEach(w => {
+        if (w.element) {
+          w.element.classList.remove('wire-path--snr-highlight');
+        }
+      });
     }
   },
 
@@ -350,6 +368,8 @@ const Workspace = {
   exportWorkspace() {
     const data = {
       displayOptions: this.displayOptions,
+      snrStartBlockId: this.snrStartBlockId,
+      snrEndBlockId: this.snrEndBlockId,
       blocks: this.blocks.map(b => ({
         id: b.id,
         type: b.type,
@@ -384,18 +404,23 @@ const Workspace = {
     
     this.clear();
     
+    this.snrStartBlockId = data.snrStartBlockId !== undefined ? data.snrStartBlockId : null;
+    this.snrEndBlockId = data.snrEndBlockId !== undefined ? data.snrEndBlockId : null;
+
     if (data.displayOptions) {
-      const fallbackCasc = data.displayOptions.showCascadedParams !== undefined ? data.displayOptions.showCascadedParams : true;
+      const fallbackCasc = data.displayOptions.showCascadedParams !== undefined ? data.displayOptions.showCascadedParams : false;
       this.displayOptions = {
         showBlockParams: data.displayOptions.showBlockParams !== undefined ? data.displayOptions.showBlockParams : true,
+        showCascadedGain: data.displayOptions.showCascadedGain !== undefined ? data.displayOptions.showCascadedGain : fallbackCasc,
         showCascadedPower: data.displayOptions.showCascadedPower !== undefined ? data.displayOptions.showCascadedPower : fallbackCasc,
         showCascadedIP3: data.displayOptions.showCascadedIP3 !== undefined ? data.displayOptions.showCascadedIP3 : fallbackCasc,
         showCascadedP1dB: data.displayOptions.showCascadedP1dB !== undefined ? data.displayOptions.showCascadedP1dB : fallbackCasc,
         showCascadedNF: data.displayOptions.showCascadedNF !== undefined ? data.displayOptions.showCascadedNF : fallbackCasc,
-        showFrequency: data.displayOptions.showFrequency !== undefined ? data.displayOptions.showFrequency : true,
+        showFrequency: data.displayOptions.showFrequency !== undefined ? data.displayOptions.showFrequency : false,
         showLogs: data.displayOptions.showLogs !== undefined ? data.displayOptions.showLogs : true
       };
       const chkBlock = document.getElementById('chk-show-block-params');
+      const chkCascGain = document.getElementById('chk-show-cascaded-gain');
       const chkCascPower = document.getElementById('chk-show-cascaded-power');
       const chkCascIP3 = document.getElementById('chk-show-cascaded-ip3');
       const chkCascP1dB = document.getElementById('chk-show-cascaded-p1db');
@@ -403,6 +428,7 @@ const Workspace = {
       const chkFreq = document.getElementById('chk-show-frequency');
       const chkLogs = document.getElementById('chk-show-logs');
       if (chkBlock) chkBlock.checked = this.displayOptions.showBlockParams;
+      if (chkCascGain) chkCascGain.checked = this.displayOptions.showCascadedGain;
       if (chkCascPower) chkCascPower.checked = this.displayOptions.showCascadedPower;
       if (chkCascIP3) chkCascIP3.checked = this.displayOptions.showCascadedIP3;
       if (chkCascP1dB) chkCascP1dB.checked = this.displayOptions.showCascadedP1dB;
@@ -873,11 +899,69 @@ const Workspace = {
     pathEl.setAttribute('d', d);
   },
 
+  findSnrPath(startId, endId) {
+    if (!startId || !endId) return null;
+    
+    // Find all paths from startId to endId using DFS/BFS.
+    // A path consists of block IDs and wire IDs.
+    const adj = {};
+    this.blocks.forEach(b => adj[b.id] = []);
+    this.wires.forEach(w => {
+      if (adj[w.sourceId]) {
+        adj[w.sourceId].push({ targetId: w.targetId, wireId: w.id });
+      }
+    });
+
+    const paths = [];
+    const visited = new Set();
+
+    const dfs = (currId, currentPathBlocks, currentPathWires) => {
+      if (currId === endId) {
+        paths.push({
+          blocks: [...currentPathBlocks],
+          wires: [...currentPathWires]
+        });
+        return;
+      }
+      visited.add(currId);
+      const neighbors = adj[currId] || [];
+      for (const n of neighbors) {
+        if (!visited.has(n.targetId)) {
+          currentPathBlocks.push(n.targetId);
+          currentPathWires.push(n.wireId);
+          dfs(n.targetId, currentPathBlocks, currentPathWires);
+          currentPathBlocks.pop();
+          currentPathWires.pop();
+        }
+      }
+      visited.delete(currId);
+    };
+
+    dfs(startId, [startId], []);
+
+    if (paths.length === 0) return null;
+    
+    // Union all blocks and wires across all paths found
+    const allBlockIds = new Set();
+    const allWireIds = new Set();
+    paths.forEach(p => {
+      p.blocks.forEach(id => allBlockIds.add(id));
+      p.wires.forEach(id => allWireIds.add(id));
+    });
+
+    return {
+      blocks: allBlockIds,
+      wires: allWireIds
+    };
+  },
+
   clear() {
     this.blocks.forEach(b => { if (b.element) b.element.remove(); });
     this.wires.forEach(w => { if (w.element) w.element.remove(); });
     this.blocks = [];
     this.wires = [];
+    this.snrStartBlockId = null;
+    this.snrEndBlockId = null;
     this.clearSelection();
   }
 };

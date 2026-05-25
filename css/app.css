@@ -76,11 +76,78 @@ html, body {
 .app-sidebar {
   width: 250px;
   background-color: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: visible;
+  transition: width 0.2s, border-color 0.2s;
+  border-right: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+#sidebar-right {
+  border-right: none;
+  border-left: 1px solid var(--border-color);
+}
+
+.app-sidebar.collapsed {
+  width: 0 !important;
+  border-color: transparent !important;
+}
+
+.app-sidebar.collapsed .sidebar-content {
+  display: none !important;
+}
+
+.sidebar-content {
+  width: 100%;
+  height: 100%;
   padding: var(--space-md);
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
   overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.sidebar-toggle-btn {
+  position: absolute;
+  top: 12px;
+  width: 14px;
+  height: 32px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  outline: none;
+}
+
+.sidebar-toggle-btn:hover {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+#sidebar-left .sidebar-toggle-btn {
+  right: -14px;
+  border-left: none;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+#sidebar-right .sidebar-toggle-btn {
+  left: -14px;
+  border-right: none;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.sidebar-resizer.collapsed {
+  display: none !important;
 }
 
 .sidebar-resizer {
@@ -255,38 +322,82 @@ html, body {
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
-  text-align: center;
   font-size: 10px;
-  line-height: 1.1;
+  line-height: 1.2;
   color: var(--text-secondary);
   pointer-events: none;
   padding-top: 4px;
+  display: grid;
+  grid-template-columns: max-content min-content max-content;
+  column-gap: 2px;
+  row-gap: 1px;
 }
 
-.rf-block__param-item {
-  display: block;
+.rf-block__param-row {
+  display: contents;
 }
 
-.rf-block__param-item--block-val {
+.rf-block__param-label {
+  text-align: right;
+  grid-column: 1;
+}
+
+.rf-block__param-colon {
+  text-align: center;
+  grid-column: 2;
+  padding: 0 1px;
+}
+
+.rf-block__param-value {
+  text-align: left;
+  grid-column: 3;
+}
+
+.rf-block__param-row--block-val .rf-block__param-value,
+.rf-block__param-row--block-val .rf-block__param-label,
+.rf-block__param-row--block-val .rf-block__param-colon {
   color: var(--text-secondary);
+  cursor: pointer;
+  pointer-events: auto;
 }
 
-.rf-block__param-item--cascading-val {
+.rf-block__param-row--cascading-val {
   color: #2980b9; /* Distinct slate blue for light mode cascaded calculations */
   font-weight: 500;
 }
 
-[data-theme="dark"] .rf-block__param-item--cascading-val {
+[data-theme="dark"] .rf-block__param-row--cascading-val {
   color: #5cc4b4; /* Muted teal accent for dark mode */
 }
 
-.rf-block__param-item--frequency-val {
+.rf-block__param-row--frequency-val {
   color: #d35400; /* Warm dark amber/orange for light mode frequencies */
   font-weight: 500;
 }
 
-[data-theme="dark"] .rf-block__param-item--frequency-val {
+[data-theme="dark"] .rf-block__param-row--frequency-val {
   color: #e67e22; /* Vibrant orange for dark mode */
+}
+
+.rf-block__param-row--snr-val {
+  color: #27ae60;
+  font-weight: 500;
+}
+
+[data-theme="dark"] .rf-block__param-row--snr-val {
+  color: #2ecc71;
+}
+
+/* Green glow SNR highlights */
+.rf-block.snr-path-highlight {
+  border-color: #2ecc71 !important;
+  box-shadow: 0 0 10px rgba(46, 204, 113, 0.6), 0 4px 6px rgba(0,0,0,0.05) !important;
+}
+
+.wire-path.wire-path--snr-highlight {
+  stroke: #2ecc71 !important;
+  stroke-width: 4px;
+  filter: drop-shadow(0 0 4px rgba(46, 204, 113, 0.6));
 }
 
 .resize-handle {
@@ -517,4 +628,30 @@ html, body {
   bottom: 100%;
   left: 100%;
   transform: translate(4px, -4px);
+}
+
+/* Help Button next to Title */
+.help-icon-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  padding: 0;
+  outline: none;
+}
+
+.help-icon-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--accent, var(--text-primary));
+  border-color: var(--accent, var(--border-color));
 }

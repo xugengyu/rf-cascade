@@ -14,6 +14,7 @@ const App = {
     this.contextMenu = document.getElementById('context-menu');
     this.modal = document.getElementById('param-modal');
     this.settingsModal = document.getElementById('settings-modal');
+    this.helpModal = document.getElementById('help-modal');
     
     window.Workspace.init();
     
@@ -41,6 +42,10 @@ const App = {
         if (this.settingsModal && !this.settingsModal.classList.contains('hidden')) {
           this.settingsModal.classList.add('hidden'); return;
         }
+        // Close help modal
+        if (this.helpModal && !this.helpModal.classList.contains('hidden')) {
+          this.helpModal.classList.add('hidden'); return;
+        }
         // Close param modal (discard changes)
         if (this.modal && !this.modal.classList.contains('hidden')) {
           this.modal.classList.add('hidden'); return;
@@ -61,6 +66,16 @@ const App = {
 
       // Ignore remaining shortcuts while typing in an input
       if (inInput) return;
+
+      if (e.altKey) {
+        if (e.key === '1') {
+          e.preventDefault();
+          this.toggleLeftSidebar();
+        } else if (e.key === '2') {
+          e.preventDefault();
+          this.toggleRightSidebar();
+        }
+      }
 
       if (e.ctrlKey || e.metaKey) {
         if (e.key === 'c' || e.key === 'C') {
@@ -142,6 +157,35 @@ const App = {
   },
   
   setupUI() {
+    // Left and Right Sidebar Toggle buttons
+    const btnToggleLeft = document.getElementById('btn-toggle-left');
+    const btnToggleRight = document.getElementById('btn-toggle-right');
+    
+    if (btnToggleLeft) {
+      btnToggleLeft.addEventListener('click', () => {
+        this.toggleLeftSidebar();
+      });
+    }
+    if (btnToggleRight) {
+      btnToggleRight.addEventListener('click', () => {
+        this.toggleRightSidebar();
+      });
+    }
+
+    // Help modal triggers
+    const btnHelp = document.getElementById('btn-help');
+    const btnHelpClose = document.getElementById('help-close');
+    if (btnHelp && this.helpModal) {
+      btnHelp.addEventListener('click', () => {
+        this.helpModal.classList.remove('hidden');
+      });
+    }
+    if (btnHelpClose && this.helpModal) {
+      btnHelpClose.addEventListener('click', () => {
+        this.helpModal.classList.add('hidden');
+      });
+    }
+
     // Save Workspace button
     document.getElementById('btn-save-ws').addEventListener('click', () => {
       window.Workspace.exportWorkspace();
@@ -254,6 +298,7 @@ const App = {
 
     // Display Options Checkboxes
     const chkBlock = document.getElementById('chk-show-block-params');
+    const chkCascGain = document.getElementById('chk-show-cascaded-gain');
     const chkCascPower = document.getElementById('chk-show-cascaded-power');
     const chkCascIP3 = document.getElementById('chk-show-cascaded-ip3');
     const chkCascP1dB = document.getElementById('chk-show-cascaded-p1db');
@@ -264,11 +309,12 @@ const App = {
     const updateOptions = () => {
       window.Workspace.displayOptions = {
         showBlockParams: chkBlock ? chkBlock.checked : true,
-        showCascadedPower: chkCascPower ? chkCascPower.checked : true,
-        showCascadedIP3: chkCascIP3 ? chkCascIP3.checked : true,
-        showCascadedP1dB: chkCascP1dB ? chkCascP1dB.checked : true,
-        showCascadedNF: chkCascNF ? chkCascNF.checked : true,
-        showFrequency: chkFreq ? chkFreq.checked : true,
+        showCascadedGain: chkCascGain ? chkCascGain.checked : false,
+        showCascadedPower: chkCascPower ? chkCascPower.checked : false,
+        showCascadedIP3: chkCascIP3 ? chkCascIP3.checked : false,
+        showCascadedP1dB: chkCascP1dB ? chkCascP1dB.checked : false,
+        showCascadedNF: chkCascNF ? chkCascNF.checked : false,
+        showFrequency: chkFreq ? chkFreq.checked : false,
         showLogs: chkLogs ? chkLogs.checked : true
       };
       
@@ -281,6 +327,7 @@ const App = {
     };
 
     if (chkBlock) chkBlock.addEventListener('change', updateOptions);
+    if (chkCascGain) chkCascGain.addEventListener('change', updateOptions);
     if (chkCascPower) chkCascPower.addEventListener('change', updateOptions);
     if (chkCascIP3) chkCascIP3.addEventListener('change', updateOptions);
     if (chkCascP1dB) chkCascP1dB.addEventListener('change', updateOptions);
@@ -289,6 +336,24 @@ const App = {
     if (chkLogs) chkLogs.addEventListener('change', updateOptions);
     
     // Context Menu Items
+    document.getElementById('menu-snr-start').addEventListener('click', () => {
+      this.hideContextMenu();
+      if (this.activeBlock && this.activeBlock.type === 'SignalSource') {
+        window.Workspace.snrStartBlockId = this.activeBlock.id;
+        window.Workspace.markStale();
+        window.Workspace.blocks.forEach(b => b.updateParamDisplay());
+      }
+    });
+
+    document.getElementById('menu-snr-end').addEventListener('click', () => {
+      this.hideContextMenu();
+      if (this.activeBlock && this.activeBlock.type === 'Load') {
+        window.Workspace.snrEndBlockId = this.activeBlock.id;
+        window.Workspace.markStale();
+        window.Workspace.blocks.forEach(b => b.updateParamDisplay());
+      }
+    });
+
     document.getElementById('menu-view-spectrum').addEventListener('click', () => {
       this.hideContextMenu();
       if (this.activeBlock) {
@@ -318,6 +383,8 @@ const App = {
     document.getElementById('menu-delete').addEventListener('click', () => {
       this.hideContextMenu();
       if (this.activeBlock) {
+        if (window.Workspace.snrStartBlockId === this.activeBlock.id) window.Workspace.snrStartBlockId = null;
+        if (window.Workspace.snrEndBlockId === this.activeBlock.id) window.Workspace.snrEndBlockId = null;
         window.Workspace.removeBlock(this.activeBlock.id);
         this.activeBlock = null;
         // Intentionally not calculating cascade automatically
@@ -336,6 +403,10 @@ const App = {
 
     document.getElementById('menu-delete-sel').addEventListener('click', () => {
       this.hideContextMenu();
+      window.Workspace.selectedBlocks.forEach(sb => {
+        if (window.Workspace.snrStartBlockId === sb.id) window.Workspace.snrStartBlockId = null;
+        if (window.Workspace.snrEndBlockId === sb.id) window.Workspace.snrEndBlockId = null;
+      });
       window.Workspace.deleteSelected();
     });
 
@@ -383,6 +454,8 @@ const App = {
     const hasSelection = selBlocksCount > 0 || selWiresCount > 0;
     const hasCopied = window.Workspace.clipboard && window.Workspace.clipboard.blocks.length > 0;
 
+    const menuSnrStart = document.getElementById('menu-snr-start');
+    const menuSnrEnd = document.getElementById('menu-snr-end');
     const menuViewSpectrum = document.getElementById('menu-view-spectrum');
     const menuEdit = document.getElementById('menu-edit');
     const menuDelete = document.getElementById('menu-delete');
@@ -395,6 +468,8 @@ const App = {
     const menuSelectCatalog = document.getElementById('menu-select-catalog');
 
     if (block && selBlocksCount <= 1 && selWiresCount === 0) {
+      menuSnrStart.style.display = block.type === 'SignalSource' ? 'block' : 'none';
+      menuSnrEnd.style.display = block.type === 'Load' ? 'block' : 'none';
       menuViewSpectrum.style.display = 'block';
       menuEdit.style.display = 'block';
       menuRename.style.display = 'block';
@@ -404,6 +479,8 @@ const App = {
         menuSelectCatalog.style.display = hasCatalog ? 'block' : 'none';
       }
     } else {
+      menuSnrStart.style.display = 'none';
+      menuSnrEnd.style.display = 'none';
       menuViewSpectrum.style.display = 'none';
       menuEdit.style.display = 'none';
       menuRename.style.display = 'none';
@@ -755,11 +832,42 @@ const App = {
     const display = document.getElementById('results-display');
     
     // Clear previous calculations
-    blocks.forEach(b => b.clearCalculations());
+    blocks.forEach(b => {
+      b.clearCalculations();
+      if (b.element) {
+        b.element.classList.remove('snr-path-highlight');
+      }
+    });
+    wires.forEach(w => {
+      if (w.element) {
+        w.element.classList.remove('wire-path--snr-highlight');
+      }
+    });
 
     if (simBlocks.length === 0) {
       display.textContent = 'Workspace is empty.';
       return false;
+    }
+
+    // Determine SNR path
+    let snrPathInfo = null;
+    if (window.Workspace.snrStartBlockId && window.Workspace.snrEndBlockId) {
+      snrPathInfo = window.Workspace.findSnrPath(window.Workspace.snrStartBlockId, window.Workspace.snrEndBlockId);
+      if (snrPathInfo) {
+        // Highlight elements along the path
+        snrPathInfo.blocks.forEach(bid => {
+          const b = blocks.find(blk => blk.id === bid);
+          if (b && b.element) {
+            b.element.classList.add('snr-path-highlight');
+          }
+        });
+        snrPathInfo.wires.forEach(wid => {
+          const w = wires.find(wr => wr.id === wid);
+          if (w && w.element) {
+            w.element.classList.add('wire-path--snr-highlight');
+          }
+        });
+      }
     }
 
     // Only allow SignalSource to act as a valid source for simulation
@@ -1094,8 +1202,35 @@ const App = {
       let power_dBm = getP(outSpectrum);
       
       if (block.type === 'Load') {
-        log += `  Absorbed Power: ${blockPin.toFixed(2)} dBm\n\n`;
+        log += `  Absorbed Power: ${blockPin.toFixed(2)} dBm\n`;
         block.calculatedPOut = undefined;
+        if (snrPathInfo && snrPathInfo.blocks.has(block.id)) {
+          let prevSnrBlock = null;
+          incomingWires.forEach(w => {
+            if (snrPathInfo.blocks.has(w.sourceId)) {
+              const pb = blocks.find(blk => blk.id === w.sourceId);
+              if (pb && pb.snrNoisePowerW !== undefined) {
+                prevSnrBlock = pb;
+              }
+            }
+          });
+
+          if (prevSnrBlock) {
+            // A load block has a gain of 1 (0 dB) and noise figure of 1 (0 dB) since it absorbs the power
+            const linearGain = 1.0;
+            const linearNF = 1.0;
+            const thermalNoiseFloorWatts = Math.pow(10, -174 / 10) / 1000;
+            
+            const outNoiseW = prevSnrBlock.snrNoisePowerW * linearGain + (linearNF - 1) * thermalNoiseFloorWatts * linearGain;
+            const outSigW = Math.pow(10, blockPin / 10) / 1000;
+            
+            block.snrSignalPowerW = outSigW;
+            block.snrNoisePowerW = outNoiseW;
+            block.calculatedSNR = 10 * Math.log10(outSigW / outNoiseW);
+            log += `  Cascaded SNR: ${block.calculatedSNR.toFixed(2)} dB\n`;
+          }
+        }
+        log += `\n`;
         block.updateParamDisplay();
         processed.add(block.id);
         continue;
@@ -1138,6 +1273,7 @@ const App = {
         blockTotalP1dbLinear = 1 / ( (1 / p1db_i) + (1 / (g_i * blockTotalP1dbLinear)) );
       }
       
+      block.calculatedGain = 10 * Math.log10(blockTotalGainLinear);
       block.calculatedPOut = power_dBm;
       block.calculatedNF = 10 * Math.log10(blockTotalF);
       
@@ -1145,15 +1281,68 @@ const App = {
       block.calculatedIIP3 = block.calculatedOIP3 !== Infinity ? block.calculatedOIP3 - (10 * Math.log10(blockTotalGainLinear)) : Infinity;
       block.calculatedP1dB_out = blockTotalP1dbLinear !== Infinity ? 10 * Math.log10(blockTotalP1dbLinear) : Infinity;
       block.calculatedFrequencies = outSpectrum.map(t => t.freq);
+
+      // SNR calculation along the path
+      if (snrPathInfo && snrPathInfo.blocks.has(block.id)) {
+        const startBlock = blocks.find(b => b.id === window.Workspace.snrStartBlockId);
+        if (startBlock) {
+          let noisePowerW;
+          const sigPowerW = Math.pow(10, power_dBm / 10) / 1000;
+          
+          if (startBlock.params.Noise_Floor_dBm_Hz !== undefined) {
+            const noiseFloor = parseFloat(startBlock.params.Noise_Floor_dBm_Hz);
+            noisePowerW = Math.pow(10, noiseFloor / 10) / 1000;
+          } else {
+            const startingSNR = startBlock.params.Starting_SNR_dB !== undefined ? parseFloat(startBlock.params.Starting_SNR_dB) : 50;
+            noisePowerW = sigPowerW / Math.pow(10, startingSNR / 10);
+          }
+          
+          if (block.id === window.Workspace.snrStartBlockId) {
+            block.calculatedSNR = 10 * Math.log10(sigPowerW / noisePowerW);
+            block.snrSignalPowerW = sigPowerW;
+            block.snrNoisePowerW = noisePowerW;
+          } else {
+            // Find incoming block on the SNR path
+            let prevSnrBlock = null;
+            incomingWires.forEach(w => {
+              if (snrPathInfo.blocks.has(w.sourceId)) {
+                const pb = blocks.find(blk => blk.id === w.sourceId);
+                if (pb && pb.snrNoisePowerW !== undefined) {
+                  prevSnrBlock = pb;
+                }
+              }
+            });
+
+            if (prevSnrBlock) {
+              const linearGain = Math.pow(10, nextBlockGain / 10);
+              const linearNF = Math.pow(10, nextBlockNF / 10);
+              const thermalNoiseFloorWatts = Math.pow(10, -174 / 10) / 1000; // -174 dBm in Watts
+              
+              // output noise power = input noise power * block gain + (block noise figure - 1) * 10^(-174/10) * block gain
+              const outNoiseW = prevSnrBlock.snrNoisePowerW * linearGain + (linearNF - 1) * thermalNoiseFloorWatts * linearGain;
+              const outSigW = Math.pow(10, power_dBm / 10) / 1000;
+              
+              block.snrSignalPowerW = outSigW;
+              block.snrNoisePowerW = outNoiseW;
+              block.calculatedSNR = 10 * Math.log10(outSigW / outNoiseW);
+            }
+          }
+        }
+      }
       
       let oip3LogVal = block.calculatedOIP3 !== Infinity ? block.calculatedOIP3.toFixed(2) + ' dBm' : 'inf';
       let iip3LogVal = block.calculatedIIP3 !== Infinity ? block.calculatedIIP3.toFixed(2) + ' dBm' : 'inf';
       let p1dbLogVal = block.calculatedP1dB_out !== Infinity ? block.calculatedP1dB_out.toFixed(2) + ' dBm' : 'inf';
       let freqLogVal = outSpectrum.length > 0 ? outSpectrum.map(t => t.freq).join(', ') + ' MHz' : 'none';
+      let snrLogVal = block.calculatedSNR !== undefined ? block.calculatedSNR.toFixed(2) + ' dB' : 'N/A';
+      log += `  Cascaded Gain: ${block.calculatedGain.toFixed(2)} dB\n`;
       log += `  Cascaded OIP3: ${oip3LogVal}\n`;
       log += `  Cascaded P1dB: ${p1dbLogVal}\n`;
       log += `  Cascaded IIP3: ${iip3LogVal}\n`;
       log += `  Frequencies: ${freqLogVal}\n`;
+      if (block.calculatedSNR !== undefined) {
+        log += `  Cascaded SNR: ${snrLogVal}\n`;
+      }
       
       block.updateParamDisplay();
       
@@ -1179,6 +1368,53 @@ const App = {
     
     display.textContent = log;
     return true;
+  },
+
+  toggleLeftSidebar() {
+    const sidebar = document.getElementById('sidebar-left');
+    const resizer = document.getElementById('resizer-left');
+    const btn = document.getElementById('btn-toggle-left');
+    if (!sidebar || !resizer) return;
+
+    const isCollapsed = sidebar.classList.contains('collapsed');
+    const width = sidebar.offsetWidth || 250;
+
+    if (isCollapsed) {
+      sidebar.classList.remove('collapsed');
+      resizer.classList.remove('collapsed');
+      if (btn) btn.textContent = '◀';
+      if (window.Workspace) {
+        window.Workspace.panX -= width;
+        window.Workspace._applyTransform();
+      }
+    } else {
+      if (window.Workspace) {
+        window.Workspace.panX += width;
+        window.Workspace._applyTransform();
+      }
+      sidebar.classList.add('collapsed');
+      resizer.classList.add('collapsed');
+      if (btn) btn.textContent = '▶';
+    }
+  },
+
+  toggleRightSidebar() {
+    const sidebar = document.getElementById('sidebar-right');
+    const resizer = document.getElementById('resizer-right');
+    const btn = document.getElementById('btn-toggle-right');
+    if (!sidebar || !resizer) return;
+
+    const isCollapsed = sidebar.classList.contains('collapsed');
+
+    if (isCollapsed) {
+      sidebar.classList.remove('collapsed');
+      resizer.classList.remove('collapsed');
+      if (btn) btn.textContent = '▶';
+    } else {
+      sidebar.classList.add('collapsed');
+      resizer.classList.add('collapsed');
+      if (btn) btn.textContent = '◀';
+    }
   }
 };
 
