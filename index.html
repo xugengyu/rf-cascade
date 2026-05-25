@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RF Cascade Analysis</title>
+  <!-- Reuse the main site CSS for base styles -->
+  <link rel="stylesheet" href="css/style.css?v=4">
+  <!-- App-specific styles -->
+  <link rel="stylesheet" href="css/app.css?v=3">
+</head>
+
+<body>
+
+  <div class="app-layout">
+    <!-- Top Bar -->
+    <header class="app-header">
+      <div class="app-header__title">RF Cascade Analysis</div>
+      <div class="app-header__actions">
+        <button id="btn-save-ws" class="app-btn">Save Workspace</button>
+        <select id="select-example" class="app-btn" style="background: var(--bg-primary); color: var(--text-primary); cursor: pointer;">
+          <option value="">Load Example...</option>
+          <option value="examples/superheterodyne.json">Super Heterodyne Link</option>
+        </select>
+        <button id="btn-load-ws" class="app-btn">Load Workspace</button>
+        <input type="file" id="input-load-ws" style="display:none;" accept=".json" />
+        <button id="btn-clear" class="app-btn">Clear Workspace</button>
+        <button id="btn-close" class="app-btn app-btn--danger">Close App</button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Area -->
+    <div class="app-main">
+      <!-- Toolbox Sidebar -->
+      <aside id="sidebar-left" class="app-sidebar">
+        <h3 class="sidebar-title">Components</h3>
+        <p class="sidebar-subtitle">Drag & Drop into workspace</p>
+
+        <div class="toolbox-items">
+          <div class="toolbox-item" draggable="true" data-type="SignalSource">
+            <span class="toolbox-item__icon" style="font-size:20px;">&#8767;</span>
+            <span class="toolbox-item__text">Signal Source</span>
+          </div>
+          <div class="toolbox-item" draggable="true" data-type="FreeSpaceLink">
+            <span class="toolbox-item__icon" style="width: 32px; height: 16px; margin: 0 auto; display: block;"><svg width="100%" height="100%" viewBox="0 0 100 40" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="max-height: 40px; display: block; margin: auto;">
+  <circle cx="10" cy="30" r="1.5" fill="currentColor" stroke="none" />
+  <path d="M 10 30 L 25 30 L 25 15" />
+  <polygon points="17,5 33,5 25,15" />
+  <path d="M 40 12 Q 46 20 40 28" />
+  <path d="M 46 10 Q 54 20 46 30" />
+  <path d="M 52 8 Q 62 20 52 32" />
+  <circle cx="90" cy="30" r="1.5" fill="currentColor" stroke="none" />
+  <path d="M 90 30 L 75 30 L 75 15" />
+  <polygon points="67,5 83,5 75,15" />
+</svg></span>
+            <span class="toolbox-item__text">Free Space Link</span>
+          </div>
+          <div class="toolbox-item" draggable="true" data-type="Amplifier">
+            <span class="toolbox-item__icon">&#9654;</span>
+            <span class="toolbox-item__text">Amplifier</span>
+          </div>
+          <div class="toolbox-item" draggable="true" data-type="Attenuator">
+            <span class="toolbox-item__icon" style="width: 32px; height: 16px; margin: 0 auto; display: block;"><svg width="100%" height="100%" viewBox="0 0 60 40" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="max-height: 40px; display: block; margin: auto;">
+  <path d="M 5 20 L 15 20" />
+  <circle cx="5" cy="20" r="1.5" fill="currentColor" stroke="none" />
+  <path d="M 45 20 L 55 20" />
+  <circle cx="55" cy="20" r="1.5" fill="currentColor" stroke="none" />
+  <rect x="15" y="5" width="30" height="30" />
+  <path d="M 30 10 L 26 12 L 34 16 L 26 20 L 34 24 L 26 28 L 30 30" />
+</svg></span>
+            <span class="toolbox-item__text">Attenuator</span>
+          </div>
+          <div class="toolbox-item" draggable="true" data-type="Filter">
+            <span class="toolbox-item__icon" style="width: 32px; height: 16px; margin: 0 auto; display: block;"><svg width="100%" height="100%" viewBox="0 0 60 40" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="max-height: 40px; display: block; margin: auto;">
+  <path d="M 5 20 L 15 20" />
+  <circle cx="5" cy="20" r="1.5" fill="currentColor" stroke="none" />
+  <path d="M 45 20 L 55 20" />
+  <circle cx="55" cy="20" r="1.5" fill="currentColor" stroke="none" />
+  <rect x="15" y="2" width="30" height="36" />
+  <path d="M 23 10 Q 26.5 7 30 10 T 37 10" />
+  <path d="M 24 13 L 36 7" />
+  <path d="M 23 20 Q 26.5 17 30 20 T 37 20" />
+  <path d="M 23 30 Q 26.5 27 30 30 T 37 30" />
+  <path d="M 24 33 L 36 27" />
+</svg></span>
+            <span class="toolbox-item__text">Filter</span>
+          </div>
+          <div class="toolbox-item" draggable="true" data-type="Splitter">
+            <span class="toolbox-item__icon" style="width: 32px; height: 16px; margin: 0 auto; display: block;"><svg width="100%" height="100%" viewBox="0 0 60 40" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="max-height: 40px; display: block; margin: auto;">
+  <rect x="15" y="5" width="30" height="30" />
+  <path d="M 5 20 L 25 20" />
+  <circle cx="5" cy="20" r="1.5" fill="currentColor" stroke="none" />
+  <polygon points="25,20 35,12 35,28" />
+  <path d="M 35 12 L 55 12" />
+  <path d="M 35 28 L 55 28" />
+  <circle cx="55" cy="12" r="1.5" fill="currentColor" stroke="none" />
+  <circle cx="55" cy="28" r="1.5" fill="currentColor" stroke="none" />
+</svg></span>
+            <span class="toolbox-item__text">Splitter</span>
+          </div>
+          <div class="toolbox-item" draggable="true" data-type="Combiner">
+            <span class="toolbox-item__icon" style="width: 32px; height: 16px; margin: 0 auto; display: block;"><svg width="100%" height="100%" viewBox="0 0 60 40" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="max-height: 40px; display: block; margin: auto;">
+  <rect x="15" y="5" width="30" height="30" />
+  <path d="M 5 12 L 25 12" />
+  <path d="M 5 28 L 25 28" />
+  <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none" />
+  <circle cx="5" cy="28" r="1.5" fill="currentColor" stroke="none" />
+  <polygon points="25,12 25,28 35,20" />
+  <path d="M 35 20 L 55 20" />
+  <circle cx="55" cy="20" r="1.5" fill="currentColor" stroke="none" />
+</svg></span>
+            <span class="toolbox-item__text">Combiner</span>
+          </div>
+          <div class="toolbox-item" draggable="true" data-type="Mixer">
+            <span class="toolbox-item__icon" style="font-size:20px; font-weight:bold;">&#8855;</span>
+            <span class="toolbox-item__text">Mixer</span>
+          </div>
+          <div class="toolbox-item" draggable="true" data-type="Load">
+            <span class="toolbox-item__icon" style="width: 32px; height: 16px; margin: 0 auto; display: block;"><svg width="100%" height="100%" viewBox="0 0 60 60" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="max-height: 50px; display: block; margin: auto;">
+  <circle cx="10" cy="20" r="1.5" fill="currentColor" stroke="none" />
+  <path d="M 10 20 L 30 20 L 30 25" />
+  <path d="M 30 25 L 25 27.5 L 35 32.5 L 25 37.5 L 35 42.5 L 25 47.5 L 30 50 L 30 52" />
+  <path d="M 22 52 L 38 52" />
+  <path d="M 25 56 L 35 56" />
+  <path d="M 28 60 L 32 60" />
+</svg></span>
+            <span class="toolbox-item__text">Load</span>
+          </div>
+          <div class="toolbox-item" draggable="true" data-type="Annotation">
+            <span class="toolbox-item__icon" style="font-size:18px;">&#128196;</span>
+            <span class="toolbox-item__text">Text Note</span>
+          </div>
+        </div>
+      </aside>
+
+      <div id="resizer-left" class="sidebar-resizer"></div>
+
+      <!-- The Node Canvas -->
+      <div id="workspace" class="workspace">
+        <!-- SVG layer for wires -->
+        <svg id="wires-layer" class="wires-layer"></svg>
+        <!-- HTML Blocks will be dynamically appended here -->
+      </div>
+
+      <div id="resizer-right" class="sidebar-resizer"></div>
+
+      <!-- Results Sidebar -->
+      <aside id="sidebar-right" class="app-sidebar">
+        <h3 class="sidebar-title">Analysis</h3>
+        <div style="display: flex; gap: var(--space-xs); margin-bottom: var(--space-md);">
+          <button id="btn-calculate" class="app-btn app-btn--primary" style="flex: 1;">Simulate</button>
+          <button id="btn-settings" class="app-btn" style="flex-shrink: 0;" title="Simulation Settings">&#9881; Settings</button>
+        </div>
+
+        <div
+          style="border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-md); margin-bottom: var(--space-md);">
+          <h4 class="sidebar-title" style="font-size: var(--text-sm); margin-bottom: var(--space-sm);">Display Options
+          </h4>
+          <div class="display-options"
+            style="display: flex; flex-direction: column; gap: var(--space-xs); font-size: var(--text-sm);">
+            <label
+              style="display: flex; align-items: center; gap: var(--space-xs); cursor: pointer; user-select: none;">
+              <input type="checkbox" id="chk-show-block-params" checked /> Block Parameters
+            </label>
+            <label
+              style="display: flex; align-items: center; gap: var(--space-xs); cursor: pointer; user-select: none;">
+              <input type="checkbox" id="chk-show-cascaded-power" checked /> Cascaded Power
+            </label>
+            <label
+              style="display: flex; align-items: center; gap: var(--space-xs); cursor: pointer; user-select: none;">
+              <input type="checkbox" id="chk-show-cascaded-ip3" checked /> Cascaded IP3
+            </label>
+            <label
+              style="display: flex; align-items: center; gap: var(--space-xs); cursor: pointer; user-select: none;">
+              <input type="checkbox" id="chk-show-cascaded-p1db" checked /> Cascaded P1dB
+            </label>
+            <label
+              style="display: flex; align-items: center; gap: var(--space-xs); cursor: pointer; user-select: none;">
+              <input type="checkbox" id="chk-show-cascaded-nf" checked /> Cascaded NF
+            </label>
+            <label
+              style="display: flex; align-items: center; gap: var(--space-xs); cursor: pointer; user-select: none;">
+              <input type="checkbox" id="chk-show-frequency" /> Frequencies
+            </label>
+            <label
+              style="display: flex; align-items: center; gap: var(--space-xs); cursor: pointer; user-select: none;">
+              <input type="checkbox" id="chk-show-logs" checked /> Simulation Logs
+            </label>
+          </div>
+        </div>
+
+        <div id="results-section">
+          <p class="sidebar-subtitle">Results</p>
+          <pre id="results-display"
+            style="white-space: pre-wrap; font-family: var(--font-mono); font-size: var(--text-sm); background: var(--bg-primary); padding: var(--space-sm); border: 1px solid var(--border-color); border-radius: var(--radius-sm); min-height: 100px; max-height: 350px; overflow-y: auto;"></pre>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Context Menu (Hidden by default) -->
+  <div id="context-menu" class="context-menu hidden">
+    <div class="context-menu__item" id="menu-view-spectrum">View Spectrum</div>
+    <div class="context-menu__item" id="menu-edit">Edit Parameters</div>
+    <div class="context-menu__item" id="menu-rename">Rename Block</div>
+    <div class="context-menu__item" id="menu-select-catalog">Select Real Component</div>
+    <div class="context-menu__item context-menu__item--danger" id="menu-delete">Delete Block</div>
+    <div class="context-menu__item" id="menu-copy">Copy Selected</div>
+    <div class="context-menu__item" id="menu-paste">Paste</div>
+    <div class="context-menu__item context-menu__item--danger" id="menu-delete-sel">Delete Selected</div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal__content">
+      <h3>&#9881; Simulation Settings</h3>
+      <div class="modal__body">
+        <p style="font-size: var(--text-sm); color: var(--text-secondary); margin: 0 0 var(--space-sm) 0;">
+          Set the minimum headroom (dB) below OIP3, IIP3, and P1dB before highlighting in red.
+        </p>
+        <div class="form-group">
+          <label for="setting-oip3-threshold">OIP3 Headroom Warning Threshold (dB)</label>
+          <div class="param-input-wrapper">
+            <input type="number" id="setting-oip3-threshold" value="10" step="1" min="0" max="60" />
+            <div class="param-spin-buttons">
+              <button class="spin-btn spin-btn--up" data-target="setting-oip3-threshold" data-step="1">&#9650;</button>
+              <button class="spin-btn spin-btn--down" data-target="setting-oip3-threshold" data-step="1">&#9660;</button>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="setting-iip3-threshold">IIP3 Headroom Warning Threshold (dB)</label>
+          <div class="param-input-wrapper">
+            <input type="number" id="setting-iip3-threshold" value="10" step="1" min="0" max="60" />
+            <div class="param-spin-buttons">
+              <button class="spin-btn spin-btn--up" data-target="setting-iip3-threshold" data-step="1">&#9650;</button>
+              <button class="spin-btn spin-btn--down" data-target="setting-iip3-threshold" data-step="1">&#9660;</button>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="setting-p1db-threshold">P1dB Headroom Warning Threshold (dB)</label>
+          <div class="param-input-wrapper">
+            <input type="number" id="setting-p1db-threshold" value="10" step="1" min="0" max="60" />
+            <div class="param-spin-buttons">
+              <button class="spin-btn spin-btn--up" data-target="setting-p1db-threshold" data-step="1">&#9650;</button>
+              <button class="spin-btn spin-btn--down" data-target="setting-p1db-threshold" data-step="1">&#9660;</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal__footer">
+        <button id="settings-close" class="app-btn app-btn--primary">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Parameter Edit Modal (Hidden by default) -->
+  <div id="param-modal" class="modal hidden">
+    <div class="modal__content">
+      <h3 id="modal-title">Edit Block</h3>
+      <div id="modal-body" class="modal__body">
+        <!-- Dynamic inputs generated by JS -->
+      </div>
+      <div class="modal__footer">
+        <button id="modal-cancel" class="app-btn">Cancel</button>
+        <button id="modal-save" class="app-btn app-btn--primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Plotly -->
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+
+  <!-- Plot Modal -->
+  <div id="plot-modal" class="modal hidden">
+    <div class="modal-content" style="max-width: 800px; width: 90%;">
+      <h3>Spectrum Analyzer</h3>
+      <div id="plot-container" style="width: 100%; height: 400px;"></div>
+      <div style="text-align: right; margin-top: 10px;">
+        <button id="plot-close-btn" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Catalog Selection Modal (Hidden by default) -->
+  <div id="catalog-modal" class="modal hidden">
+    <div class="modal__content" style="max-width: 600px; width: 90%;">
+      <h3>Select Real Component</h3>
+      <div class="modal__body">
+        <input type="text" id="catalog-search-input" placeholder="Search Mini-Circuits parts..." style="width: 100%; padding: 8px; margin-bottom: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-primary); color: var(--text-primary);" />
+        <div id="catalog-results-list" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-xs);">
+          <!-- Results generated dynamically -->
+        </div>
+      </div>
+      <div class="modal__footer">
+        <button id="catalog-modal-cancel" class="app-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/minicircuits_catalog.js?v=28"></script>
+  <script src="js/blocks.js?v=28"></script>
+  <script src="js/workspace.js?v=28"></script>
+  <script src="js/app.js?v=28"></script>
+</body>
+
+</html>
